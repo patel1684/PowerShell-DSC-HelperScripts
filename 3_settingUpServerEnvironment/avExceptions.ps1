@@ -22,23 +22,31 @@ $foldersToExclude = @(
 
 # Script block to execute on each machine
 $scriptBlock = {
-    param($foldersToExclude)
     $serverName = $env:COMPUTERNAME
     Write-Host "Starting to exclude folders from Windows Defender on $serverName"
-    foreach ($folder in $foldersToExclude) {
-        Add-MpPreference -ExclusionPath $folder
-        Write-Host "Excluded $folder on $serverName"
+
+    # Fetch existing exclusions to avoid duplicates
+    $mp = Get-MpPreference
+    $existing = @($mp.ExclusionPath)
+
+    foreach ($folder in $Using:foldersToExclude) {
+        if ($existing -contains $folder) {
+            Write-Host "Already excluded: $folder on $serverName"
+        } else {
+            try {
+                Add-MpPreference -ExclusionPath $folder
+                Write-Host "Excluded: $folder on $serverName"
+            } catch {
+                Write-Warning "Failed to exclude $folder on $serverName. Error: $($_.Exception.Message)"
+            }
+        }
     }
+
     Write-Host "Completed excluding folders from Windows Defender on $serverName"
 }
 
 # Execute the script block on each target machine
 foreach ($computer in $computers) {
-    Invoke-Command -ComputerName $computer -ScriptBlock $scriptBlock -ArgumentList $foldersToExclude
+    Invoke-Command -ComputerName $computer -ScriptBlock $scriptBlock
 }
-
-
-
-
-
 
